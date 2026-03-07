@@ -1,9 +1,12 @@
 import { supabase } from '@/lib/supabase';
-import EventList from '@/components/EventList';
+import CalendarGrid from '@/components/CalendarGrid';
+import { format } from 'date-fns';
 
 export const revalidate = 3600; // Revalidate every hour
 
-export default async function Home() {
+export default async function CalendarPage() {
+  const currentMonth = new Date();
+
   // Fetch events from Supabase
   const { data: events, error } = await supabase
     .from('events')
@@ -17,7 +20,7 @@ export default async function Home() {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">Events in Maplewood & South Orange</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">Calendar View</h1>
           <p className="text-red-600">Error loading events. Please try again later.</p>
         </div>
       </div>
@@ -30,15 +33,15 @@ export default async function Home() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Events in Maplewood & South Orange
+            {format(currentMonth, 'MMMM yyyy')}
           </h1>
           <p className="text-gray-600">
-            Discover what's happening in your community over the next 30 days
+            Click on any event to see more details
           </p>
         </div>
 
-        {/* Event List with Filters */}
-        <EventList events={events || []} />
+        {/* Calendar */}
+        <CalendarGrid events={events || []} currentMonth={currentMonth} />
       </div>
     </div>
   );
