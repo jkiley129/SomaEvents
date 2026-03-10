@@ -5,11 +5,11 @@
 
 import type { EventSource } from './types';
 
-// Import source scrapers (will be implemented in Phase 5)
-// import { SODTSource } from './sources/sodt';
-// import { MACSource } from './sources/mac';
-// import { PalletSource } from './sources/pallet';
-// import { SOPACSource } from './sources/sopac';
+// Import source scrapers
+import { SODTSource } from './sources/sodt';
+import { MACSource } from './sources/mac';
+import { PalletSource } from './sources/pallet';
+import { SOPACSource } from './sources/sopac';
 
 /**
  * Registry of all event sources
@@ -19,12 +19,11 @@ export class SourceRegistry {
   private sources: Map<string, EventSource> = new Map();
 
   constructor() {
-    // Register sources here
-    // Phase 5: Uncomment these as sources are implemented
-    // this.register(new SODTSource());
-    // this.register(new MACSource());
-    // this.register(new PalletSource());
-    // this.register(new SOPACSource());
+    // Register all event sources
+    this.register(new SODTSource());
+    this.register(new MACSource());
+    this.register(new PalletSource());
+    this.register(new SOPACSource());
   }
 
   /**

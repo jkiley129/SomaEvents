@@ -135,9 +135,9 @@ export class ScraperLogger {
  * Base scraper class with common functionality
  */
 export abstract class BaseScraper {
-  protected name: string;
-  protected slug: string;
-  protected url: string;
+  public name: string;
+  public slug: string;
+  public url: string;
   protected logger: ScraperLogger;
   protected rateLimiter: RateLimiter;
 
