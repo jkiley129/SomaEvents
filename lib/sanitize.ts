@@ -3,7 +3,7 @@
  * Ensures user-facing HTML is safe and family-friendly
  */
 
-import sanitizeHtml from 'sanitize-html';
+import sanitizeHtmlLib from 'sanitize-html';
 
 /**
  * Allowed HTML tags for event descriptions
@@ -48,7 +48,7 @@ const ALLOWED_SCHEMES = ['http', 'https', 'mailto'];
 export function sanitizeHtml(html: string): string {
   if (!html) return '';
 
-  return sanitizeHtml(html, {
+  return sanitizeHtmlLib(html, {
     allowedTags: ALLOWED_TAGS,
     allowedAttributes: ALLOWED_ATTRIBUTES,
     allowedSchemes: ALLOWED_SCHEMES,
@@ -57,7 +57,7 @@ export function sanitizeHtml(html: string): string {
     },
     // Ensure links open in new tab
     transformTags: {
-      'a': (tagName, attribs) => {
+      'a': (tagName: string, attribs: Record<string, string>) => {
         return {
           tagName: 'a',
           attribs: {
@@ -78,7 +78,7 @@ export function sanitizeHtml(html: string): string {
 export function htmlToPlainText(html: string): string {
   if (!html) return '';
 
-  return sanitizeHtml(html, {
+  return sanitizeHtmlLib(html, {
     allowedTags: [],
     allowedAttributes: {},
   })
