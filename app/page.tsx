@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import EventList from '@/components/EventList';
 
+export const dynamic = 'force-dynamic'; // Force dynamic rendering
 export const revalidate = 0; // Disable caching for debugging
 
 export default async function Home() {
