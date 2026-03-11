@@ -1,16 +1,26 @@
 import { supabase } from '@/lib/supabase';
 import EventList from '@/components/EventList';
 
-export const revalidate = 3600; // Revalidate every hour
+export const revalidate = 0; // Disable caching for debugging
 
 export default async function Home() {
+  const today = new Date().toISOString().split('T')[0];
+
   // Fetch events from Supabase
   const { data: events, error } = await supabase
     .from('events')
     .select('*')
     .eq('status', 'active')
-    .gte('start_date', new Date().toISOString().split('T')[0])
+    .gte('start_date', today)
     .order('start_date', { ascending: true });
+
+  // Debug logging
+  console.log('=== HOME PAGE DEBUG ===');
+  console.log('Today:', today);
+  console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+  console.log('Error:', error);
+  console.log('Events count:', events?.length || 0);
+  console.log('Events:', events?.map(e => ({ title: e.title, date: e.start_date })));
 
   if (error) {
     console.error('Error fetching events:', error);
@@ -19,6 +29,7 @@ export default async function Home() {
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-900 mb-4">Events in Maplewood & South Orange</h1>
           <p className="text-red-600">Error loading events. Please try again later.</p>
+          <pre className="mt-4 text-left bg-gray-100 p-4 rounded">{JSON.stringify(error, null, 2)}</pre>
         </div>
       </div>
     );
