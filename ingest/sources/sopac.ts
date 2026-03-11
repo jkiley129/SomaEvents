@@ -1,6 +1,8 @@
 /**
  * SOPAC (South Orange Performing Arts Center) Event Source
  * https://www.sopacnow.org/events/
+ *
+ * Uses RSS feed to get events, then fetches individual event pages for details
  */
 
 import { BaseScraper } from '../base-scraper';
@@ -10,8 +12,15 @@ import { determineTown, getVenueShortName, isEligibleLocation } from '@/lib/geo'
 import { isWithinEventWindow, determineTimeClarity, combineDateTime } from '@/lib/date-utils';
 import { generateEventSlug } from '@/lib/slug';
 import { sanitizeHtml as sanitize, htmlToPlainText } from '@/lib/sanitize';
+import * as cheerio from 'cheerio';
+import { parseString } from 'xml2js';
+import { promisify } from 'util';
+
+const parseXml = promisify(parseString);
 
 export class SOPACSource extends BaseScraper implements EventSource {
+  private readonly feedUrl = 'https://www.sopacnow.org/events/feed/';
+
   constructor() {
     super(
       'SOPAC',
@@ -26,20 +35,136 @@ export class SOPACSource extends BaseScraper implements EventSource {
     const normalizedEvents: NormalizedEvent[] = [];
 
     try {
-      // TODO: Implement SOPAC scraper
-      // SOPAC has a dedicated events page
-      // Need to inspect structure and implement parsing logic
-      //
-      // IMPORTANT: SOPAC events should ALWAYS be included (per PRD)
-      // even if address information is incomplete
+      // Fetch RSS feed
+      const feedXml = await this.fetchHtml(this.feedUrl);
+      const feed: any = await parseXml(feedXml);
 
-      this.logger.warn('SOPAC scraper not fully implemented');
+      if (!feed?.rss?.channel?.[0]?.item) {
+        this.logger.warn('No events found in RSS feed');
+        return [];
+      }
 
-      this.logger.info(`Found ${normalizedEvents.length} events from SOPAC`);
+      const items = feed.rss.channel[0].item;
+      this.logger.info(`Found ${items.length} events in RSS feed`);
+
+      // Process each event (limit to first 10 for testing)
+      const itemsToProcess = items.slice(0, 10);
+
+      for (const item of itemsToProcess) {
+        try {
+          const eventUrl = item.link?.[0];
+          const title = item.title?.[0];
+
+          if (!eventUrl || !title) {
+            this.logger.warn(`Skipping event with missing URL or title`);
+            continue;
+          }
+
+          this.logger.info(`Fetching event: ${title}`);
+
+          // Fetch event detail page
+          const html = await this.fetchHtml(eventUrl);
+          const raw = this.parseEventPage(html, eventUrl);
+
+          if (!raw) continue;
+
+          const normalized = this.normalizeEvent(raw);
+          if (normalized) {
+            normalizedEvents.push(normalized);
+          }
+        } catch (error) {
+          this.logger.error(`Error processing event`, error as Error);
+        }
+      }
+
+      this.logger.info(`Found ${normalizedEvents.length} eligible events from SOPAC`);
       return normalizedEvents;
     } catch (error) {
       this.logger.error('Failed to fetch SOPAC events', error as Error);
       return [];
+    }
+  }
+
+  /**
+   * Parses an individual event page
+   */
+  private parseEventPage(html: string, url: string): RawEvent | null {
+    try {
+      const $ = cheerio.load(html);
+
+      // Extract title
+      const title = $('h1').first().text().trim();
+      if (!title) return null;
+
+      // Extract date/time - format: "THU, MAR 12, 2026 at 7:30PM"
+      const dateTimeText = $('.event-dates h3').first().text().trim();
+      const { startDate, startTime } = this.parseDateTimeText(dateTimeText);
+
+      if (!startDate) {
+        this.logger.warn(`Could not parse date for: ${title}`);
+        return null;
+      }
+
+      // Extract description
+      const description = $('.entry-content').text().trim();
+
+      // Extract ticket URL
+      const ticketUrl = $('a.btn-primary[href*="salesforce-sites"]').attr('href') || undefined;
+
+      // Extract image
+      const imageUrl = $('.page-header--image').css('background-image')?.match(/url\((.*?)\)/)?.[1]?.replace(/['"]/g, '') || undefined;
+
+      // Extract genre/category from classes
+      const articleClasses = $('article').attr('class') || '';
+      const genreMatch = articleClasses.match(/xdgp_genre-(\w+)/);
+      const category = genreMatch ? genreMatch[1] : undefined;
+
+      return {
+        title,
+        url,
+        startDate,
+        startTime,
+        description,
+        ticketUrl,
+        imageUrl,
+        categories: category ? [category] : [],
+      };
+    } catch (error) {
+      this.logger.error('Error parsing event page', error as Error);
+      return null;
+    }
+  }
+
+  /**
+   * Parses SOPAC date/time format: "THU, MAR 12, 2026 at 7:30PM"
+   */
+  private parseDateTimeText(text: string): { startDate?: string; startTime?: string } {
+    try {
+      // Example: "THU, MAR 12, 2026 at 7:30PM"
+      const match = text.match(/([A-Z]{3}),\s+([A-Z]{3})\s+(\d{1,2}),\s+(\d{4})\s+at\s+(\d{1,2}:\d{2}[AP]M)/i);
+
+      if (!match) {
+        return {};
+      }
+
+      const [, , month, day, year, time] = match;
+
+      // Convert month name to number
+      const monthMap: Record<string, string> = {
+        'JAN': '01', 'FEB': '02', 'MAR': '03', 'APR': '04',
+        'MAY': '05', 'JUN': '06', 'JUL': '07', 'AUG': '08',
+        'SEP': '09', 'OCT': '10', 'NOV': '11', 'DEC': '12'
+      };
+
+      const monthNum = monthMap[month.toUpperCase()];
+      if (!monthNum) return {};
+
+      const startDate = `${year}-${monthNum}-${day.padStart(2, '0')}`;
+      const startTime = time;
+
+      return { startDate, startTime };
+    } catch (error) {
+      return {};
     }
   }
 
